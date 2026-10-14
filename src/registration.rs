@@ -1,0 +1,203 @@
+// SPDX-FileCopyrightText: Copyright Logically Magic Inc. <hello@logicallymagic.com>
+// SPDX-FileCopyrightText: Copyright Hamid Jahanzad <Hamid@Jahanzad.com>
+// SPDX-FileCopyrightText: Copyright Contributors to the Sentin8:Secrets
+// SPDX-License-Identifier: Apache-2.0
+
+//! Service self-registration data for Sentin8:Secrets.
+//!
+//! Output via `--print-registration` flag. The CLI runs the binary with this
+//! flag and consumes the JSON to register the service in the platform DB.
+//! See `design/sentin8-service-self-registration-design.md`.
+
+use sentin8::registration::{
+    AdminScope, AdminUi, AdminUiPage, PgRole, PolicySetDecl, Registration, RelationDecl,
+    ScheduleDecl, SqlMigration,
+};
+use utoipa::OpenApi;
+
+const PG_ROLES: &[PgRole] = &[PgRole {
+    scope: "sentin8:secrets:secret:read,sentin8:secrets:secret:write",
+    role: "sentin8_secrets_service",
+    bypass_rls: false,
+    database: "sentin8",
+    cross_schema_grants: &[],
+}];
+
+// Admin role scopes — the secret-management vocabulary from the design
+// Handlers gate destructive/lifecycle ops on `sentin8:secrets:secret:admin`
+// and reads/writes on the read/write pair (auth design
+// provisioning-consistency rule: the registration declares the authoritative
+// scope vocabulary for the `sentin8:secrets:admin` role). The policy-admin
+// pair follows the per-service convention.
+const ADMIN_SCOPES: &[AdminScope] = &[
+    AdminScope::Tuple("sentin8:secrets:admin", "sentin8:secrets:admin"),
+    AdminScope::Tuple("sentin8:secrets:admin", "sentin8:secrets:secret:read"),
+    AdminScope::Tuple("sentin8:secrets:admin", "sentin8:secrets:secret:write"),
+    AdminScope::Tuple("sentin8:secrets:admin", "sentin8:secrets:secret:admin"),
+    // Policy-admin surface (policy design ; per-service scope).
+    AdminScope::Tuple("sentin8:secrets:admin", "sentin8:secrets:policy:read"),
+    AdminScope::Tuple("sentin8:secrets:admin", "sentin8:secrets:policy:write"),
+];
+
+const ADMIN_UI_PAGES: &[AdminUiPage] = &[
+    AdminUiPage {
+        route: "overview",
+        label: "Overview",
+        ui_endpoint: "/v1/admin/ui/overview",
+        data_endpoint: "/v1/admin/overview",
+        icon: "0xe899",
+    },
+    AdminUiPage {
+        route: "secrets",
+        label: "Secrets",
+        ui_endpoint: "/v1/admin/ui/secrets",
+        data_endpoint: "/v1/admin/secrets",
+        icon: "0xe0d0",
+    },
+    AdminUiPage {
+        route: "settings",
+        label: "Settings",
+        ui_endpoint: "/v1/admin/ui/settings",
+        data_endpoint: "/v1/admin/settings",
+        icon: "0xe57f",
+    },
+    AdminUiPage {
+        route: "policy-sets",
+        label: "Policy Sets",
+        ui_endpoint: "/v1/admin/ui/policy-sets",
+        data_endpoint: "/v1/admin/policy-sets",
+        icon: "0xe8b8",
+    },
+    AdminUiPage {
+        route: "policy-decisions",
+        label: "Policy Decisions",
+        ui_endpoint: "/v1/admin/ui/policy-decisions",
+        data_endpoint: "/v1/admin/policy-decisions",
+        icon: "0xf070",
+    },
+];
+
+const SQL_1_INIT: &str = include_str!("../sql/init.sql");
+
+/// Serialize the utoipa OpenAPI spec (used for the `all` and `openapi` sections).
+fn openapi_spec() -> serde_json::Value {
+    serde_json::to_value(crate::openapi::SecretsOpenApi::openapi())
+        .unwrap_or(serde_json::Value::Null)
+}
+
+/// Default declarative policy sets (Sentin8:Policy design /):
+/// action-granular scope permits over the LIVE effective scope set. Seeded
+/// `origin='platform'`, `mode='enforced'` ( — step 5 is
+/// the only gate; shadow is the emergency one-UPDATE rollback lever only).
+const POLICIES: &[PolicySetDecl] = &[
+    PolicySetDecl {
+        policy_set_name: "scope-mirror",
+        description: "Action-granular scope permits for sentin8:secrets over the LIVE effective scope set (design §3.1d). Enforced (decision 2026-09-07) — step 5 is the only gate.",
+        policies: "permit(principal, action == Action::\"sentin8:secrets:secret:read\", resource) when { principal.scopes.contains(\"sentin8:secrets:secret:read\") };\npermit(principal, action == Action::\"sentin8:secrets:secret:read\", resource) when { principal.scopes.contains(\"sentin8:secrets:secret:admin\") };\npermit(principal, action == Action::\"sentin8:secrets:secret:read\", resource) when { principal.scopes.contains(\"sentin8:secrets:admin\") };\npermit(principal, action == Action::\"sentin8:secrets:secret:write\", resource) when { principal.scopes.contains(\"sentin8:secrets:secret:write\") };\npermit(principal, action == Action::\"sentin8:secrets:secret:write\", resource) when { principal.scopes.contains(\"sentin8:secrets:secret:admin\") };\npermit(principal, action == Action::\"sentin8:secrets:secret:write\", resource) when { principal.scopes.contains(\"sentin8:secrets:admin\") };\npermit(principal, action == Action::\"sentin8:secrets:secret:admin\", resource) when { principal.scopes.contains(\"sentin8:secrets:secret:admin\") };\npermit(principal, action == Action::\"sentin8:secrets:secret:admin\", resource) when { principal.scopes.contains(\"sentin8:secrets:admin\") };",
+        schema: None,
+        mode: "enforced",
+        default_enabled: true,
+    },
+];
+
+/// Default ReBAC relation tuples — none declared by this
+/// service today; env admins author their own graph via the admin API.
+const RELATIONS: &[RelationDecl] = &[];
+
+/// Print the registration JSON to stdout.
+///
+/// With no `--section` argument, outputs the full registration object.
+/// With `--section=<name>`, outputs only that section as a standalone JSON value.
+/// M2M DCR workload grants (self-registration ): this
+/// service's own `certless:<workload>` rows, upserted by `vertical enroll`.
+/// The static auth seed is retired — this declaration is the ONLY
+/// provisioning path ( "DCR is dynamic").
+/// Cover BOTH the full-identity `-policy` spelling (policy_bus_client) and
+/// the bare `{short}-policy` spelling (stat_emit); the gate's superset
+/// check admits any requested subset.
+const M2M_GRANTS: &[sentin8::registration::M2mGrant] = &[
+    sentin8::registration::M2mGrant {
+        workload: "secrets-audit",
+        scopes: &["sentin8:sys:audit:write"],
+    },
+    sentin8::registration::M2mGrant {
+        workload: "sentin8:secrets",
+        scopes: &["sentin8:bus:produce"],
+    },
+    sentin8::registration::M2mGrant {
+        workload: "sentin8:secrets-policy",
+        scopes: &["sentin8:bus:consume", "sentin8:stat:measure"],
+    },
+    sentin8::registration::M2mGrant {
+        workload: "secrets-policy",
+        scopes: &["sentin8:bus:consume", "sentin8:stat:measure"],
+    },
+    // Cron schedule self-registration (secrets DESIGN §10): the boot
+    // registers the daily expiry-scan schedule with Cron.
+    sentin8::registration::M2mGrant {
+        workload: "secrets-cron",
+        scopes: &["sentin8:cron:write"],
+    },
+    // TLS-RLS-4 (design/sentin8-vertical-data-plane-contract.md §VDC.7): the database-free HostContextResolver’s resolve workload — cache miss calls Sys `GET /v1/resolve/hostname`.
+    sentin8::registration::M2mGrant {
+        workload: "sentin8-secrets-tls",
+        scopes: &["sentin8:sys:instances:read"],
+    },
+];
+
+/// Handle print.
+pub fn print(section: Option<String>) -> anyhow::Result<()> {
+    let reg = Registration {
+        service_type: "sentin8:secrets",
+        subdomain: "secrets",
+        health_path: "/v1/health",
+        admin_scopes: ADMIN_SCOPES,
+        error_codes: &[],
+        consent_providers: &[],
+        consent_flows: &[],
+        admin_ui: Some(AdminUi {
+            label: "Secrets",
+            icon: "0xe0d0",
+            service_flag: "secrets",
+            pages: ADMIN_UI_PAGES,
+        }),
+        sql_migrations: vec![SqlMigration {
+            version: 1,
+            name: "init",
+            sql: SQL_1_INIT,
+        }],
+        pg_roles: PG_ROLES,
+        policies: POLICIES,
+        relations: RELATIONS,
+        event_triggers: &[],
+        // Declarative schedules (SDD §2.4): recurring internal maintenance
+        // owned by cron, declared here, provisioned by `vertical enroll`
+        // (no boot-time cron registration — the deleted self-registration
+        // path). The expiry scan runs daily 05:00; the version prune runs
+        // 05:30 right after it. Both proxy-call `/v1/internal/schedules/run`
+        // with `schedule_type` — the same maintenance the admin endpoint
+        // runs (secrets DESIGN §10).
+        schedules: &[
+            ScheduleDecl {
+                schedule_type: "secrets-expiry-scan",
+                cron_expression: "0 5 * * *",
+                timezone: "UTC",
+                target_config: r#"{"internalPath": "/v1/internal/schedules/run", "scheduleType": "secrets-expiry-scan"}"#,
+                max_retries: 3,
+            },
+            ScheduleDecl {
+                schedule_type: "secrets-version-prune",
+                cron_expression: "30 5 * * *",
+                timezone: "UTC",
+                target_config: r#"{"internalPath": "/v1/internal/schedules/run", "scheduleType": "secrets-version-prune"}"#,
+                max_retries: 3,
+            },
+        ],
+        audit_findings: None,
+        service_actions: None,
+        m2m_grants: Some(M2M_GRANTS),
+        openapi_url: "/openapi.json",
+        openapi: openapi_spec,
+    };
+    sentin8::registration::print_registration(section, &reg, openapi_spec)
+}
