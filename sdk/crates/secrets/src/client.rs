@@ -9,7 +9,6 @@
 //! (`POST /v1/secrets/resolve`) with an M2M bearer token. Static-token and
 //! dynamic-token-source construction mirror the storage-client pattern.
 
-
 use crate::{SecretError, SecretValue};
 
 #[derive(Clone)]
@@ -61,8 +60,7 @@ impl SecretsClient {
         cert_path: &str,
         key_path: &str,
     ) -> Result<Self, String> {
-        let mtls =
-            sentin8_middleware::mtls::MtlsConfig::new(ca_cert_path, cert_path, key_path);
+        let mtls = sentin8_middleware::mtls::MtlsConfig::new(ca_cert_path, cert_path, key_path);
         Ok(Self {
             base_url: base_url.into().trim_end_matches('/').to_string(),
             http: sentin8_middleware::mtls::build_mtls_client(&mtls)?,
