@@ -1,0 +1,534 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "sentin8-secrets-server",
+    "description": "Sentin8 Sentin8:Secrets — tenant secret management service.",
+    "license": {
+      "name": "MIT OR Apache-2.0",
+      "identifier": "MIT OR Apache-2.0"
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/v1/health": {
+      "get": {
+        "tags": [
+          "secrets"
+        ],
+        "summary": "`GET /v1/health` — custom payload (shell supplies the standard one too).\nHandle health handler.",
+        "operationId": "secrets.health",
+        "responses": {
+          "200": {
+            "description": "Service healthy"
+          }
+        }
+      }
+    },
+    "/v1/secrets": {
+      "get": {
+        "tags": [
+          "secrets"
+        ],
+        "summary": "`GET /v1/secrets` — list metadata (names, versions, status — NEVER values).\nList secrets.",
+        "operationId": "secret.list",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "path",
+            "description": "The status.",
+            "required": true,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Secret metadata list"
+          },
+          "403": {
+            "description": "Missing secrets scope"
+          }
+        },
+        "security": [
+          {
+            "sentin8:secrets:secret:read": []
+          }
+        ]
+      }
+    },
+    "/v1/secrets/maintenance/prune": {
+      "post": {
+        "tags": [
+          "secrets"
+        ],
+        "summary": "`POST /v1/secrets/maintenance/prune` — delete versions older than the\ncurrent one past the retention window (default 7d; `SENTIN8_SECRETS_PRUNE_DAYS`).\nIdempotent; safe to call from Sentin8:Cron (proxy-back). The reveal-audit\ntable is NEVER pruned (security-relevant history).\nHandle maintenance prune.",
+        "operationId": "secrets.maintenance.prune",
+        "responses": {
+          "200": {
+            "description": "Prune summary"
+          },
+          "403": {
+            "description": "Missing secrets admin scope"
+          }
+        },
+        "security": [
+          {
+            "sentin8:secrets:secret:admin": []
+          }
+        ]
+      }
+    },
+    "/v1/secrets/maintenance/re-encrypt": {
+      "post": {
+        "tags": [
+          "secrets"
+        ],
+        "summary": "Handle maintenance re encrypt.",
+        "operationId": "secrets.maintenance.re-encrypt",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReEncryptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Re-encrypt summary"
+          },
+          "400": {
+            "description": "Invalid previous key"
+          },
+          "403": {
+            "description": "Missing secrets admin scope"
+          }
+        },
+        "security": [
+          {
+            "sentin8:secrets:secret:admin": []
+          }
+        ]
+      }
+    },
+    "/v1/secrets/resolve": {
+      "post": {
+        "tags": [
+          "secrets"
+        ],
+        "summary": "Resolve secret.",
+        "operationId": "secret.resolve",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Resolved value (audit-logged)"
+          },
+          "400": {
+            "description": "Invalid reference"
+          },
+          "403": {
+            "description": "Missing secrets scope"
+          },
+          "404": {
+            "description": "Secret not found or disabled"
+          }
+        },
+        "security": [
+          {
+            "sentin8:secrets:secret:read": []
+          }
+        ]
+      }
+    },
+    "/v1/secrets/{name}": {
+      "get": {
+        "tags": [
+          "secrets"
+        ],
+        "summary": "`GET /v1/secrets/{name}` — metadata for one secret (no value).\nFetch secret.",
+        "operationId": "secret.get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Secret name path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Secret metadata"
+          },
+          "403": {
+            "description": "Missing secrets scope"
+          },
+          "404": {
+            "description": "Secret not found"
+          }
+        },
+        "security": [
+          {
+            "sentin8:secrets:secret:read": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "secrets"
+        ],
+        "summary": "Handle PUT secret.",
+        "operationId": "secret.upsert",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Secret name path (e.g. stripe/api_key)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertSecretRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Secret stored (metadata returned)"
+          },
+          "400": {
+            "description": "Invalid name"
+          },
+          "403": {
+            "description": "Missing secrets scope"
+          }
+        },
+        "security": [
+          {
+            "sentin8:secrets:secret:write": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "secrets"
+        ],
+        "summary": "`DELETE /v1/secrets/{name}` — soft-disable (status → disabled). Hard\ndelete is not exposed (values are purge-able via version prune only).\nDelete secret.",
+        "operationId": "secret.delete",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Secret name path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Secret disabled"
+          },
+          "403": {
+            "description": "Missing secrets scope"
+          },
+          "404": {
+            "description": "Secret not found"
+          }
+        },
+        "security": [
+          {
+            "sentin8:secrets:secret:admin": []
+          }
+        ]
+      }
+    },
+    "/v1/secrets/{name}/history": {
+      "get": {
+        "tags": [
+          "secrets"
+        ],
+        "summary": "`GET /v1/secrets/{name}/history` — version metadata list (no values).\nHandle secret history.",
+        "operationId": "secret.history",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Secret name path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Version metadata list"
+          },
+          "403": {
+            "description": "Missing secrets scope"
+          },
+          "404": {
+            "description": "Secret not found"
+          }
+        },
+        "security": [
+          {
+            "sentin8:secrets:secret:read": []
+          }
+        ]
+      }
+    },
+    "/v1/secrets/{name}/reads": {
+      "get": {
+        "tags": [
+          "secrets"
+        ],
+        "summary": "`GET /v1/secrets/{name}/reads` — reveal audit trail (admin).\nHandle secret reads.",
+        "operationId": "secret.reads",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Secret name path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reveal audit rows"
+          },
+          "403": {
+            "description": "Missing secrets admin scope"
+          },
+          "404": {
+            "description": "Secret not found"
+          }
+        },
+        "security": [
+          {
+            "sentin8:secrets:secret:admin": []
+          }
+        ]
+      }
+    },
+    "/v1/secrets/{name}/reveal": {
+      "get": {
+        "tags": [
+          "secrets"
+        ],
+        "summary": "`GET /v1/secrets/{name}/reveal` — return the value. Admin scope; every\ncall writes a `reads` audit row.\nHandle reveal secret.",
+        "operationId": "secret.reveal",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Secret name path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revealed value (audit-logged)"
+          },
+          "403": {
+            "description": "Missing secrets admin scope"
+          },
+          "404": {
+            "description": "Secret not found or disabled"
+          }
+        },
+        "security": [
+          {
+            "sentin8:secrets:secret:admin": []
+          }
+        ]
+      }
+    },
+    "/v1/secrets/{name}/rotate": {
+      "post": {
+        "tags": [
+          "secrets"
+        ],
+        "summary": "`POST /v1/secrets/{name}/rotate` — new version from body value; the old\nversion is retained until the prune window.\nRotate secret.",
+        "operationId": "secret.rotate",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Secret name path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertSecretRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Secret rotated (metadata returned)"
+          },
+          "403": {
+            "description": "Missing secrets scope"
+          },
+          "404": {
+            "description": "Secret not found"
+          }
+        },
+        "security": [
+          {
+            "sentin8:secrets:secret:write": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ListSecretsQuery": {
+        "type": "object",
+        "description": "The listsecretsquery type.",
+        "properties": {
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The status."
+          }
+        }
+      },
+      "ReEncryptRequest": {
+        "type": "object",
+        "description": "`POST /v1/secrets/maintenance/re-encrypt` — re-encrypt rows whose\n`key_version` is below the current master-key epoch (design\nrotation lever). Read old / write new per row; idempotent + resumable\n(rows keep their old `key_version` until successfully re-written).\nRequest body for reencrypt.",
+        "required": [
+          "previous_master_key"
+        ],
+        "properties": {
+          "new_key_version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "New epoch to stamp on re-encrypted rows (defaults to 1).\nThe new key version."
+          },
+          "previous_master_key": {
+            "type": "string",
+            "description": "The PREVIOUS master key (base64-32) used to open `key_version < current` rows.\nThe previous master key."
+          }
+        }
+      },
+      "ResolveRequest": {
+        "type": "object",
+        "description": "`POST /v1/secrets/resolve` — machine resolution. Body:\n`{\"ref\": \"secrets://<name>\"}` → `{\"value\": ..., \"version\": ...}`.\nStandard consumption path for services; audit row per call.\nRequest body for resolve.",
+        "required": [
+          "ref"
+        ],
+        "properties": {
+          "ref": {
+            "type": "string",
+            "description": "Secret reference URI (`secrets://<name>`; a bare name is accepted)."
+          }
+        }
+      },
+      "ResolveResponse": {
+        "type": "object",
+        "description": "Response payload for resolve.",
+        "required": [
+          "name",
+          "value",
+          "version"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name."
+          },
+          "value": {
+            "type": "string",
+            "description": "The value."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The version."
+          }
+        }
+      },
+      "UpsertSecretRequest": {
+        "type": "object",
+        "description": "`PUT /v1/secrets/{name}` — upsert + new version.\nRequest body for upsertsecret.",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "The description."
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Optional expiry — a Cron schedule emits `sentin8:secrets:secret:expiring`\nT-14d before it (secrets README §7)."
+          },
+          "value": {
+            "type": "string",
+            "description": "Plaintext secret value (encrypted server-side, never stored as sent).\nThe value."
+          }
+        }
+      }
+    }
+  },
+  "security": [],
+  "tags": [
+    {
+      "name": "secrets",
+      "description": "Sentin8:Secrets — tenant secret management (encrypted at rest, reference-based, audit-logged reveals)"
+    }
+  ]
+}
