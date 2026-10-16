@@ -4,7 +4,11 @@
     {
       "service_type": "sentin8:secrets",
       "subdomain": "secrets",
-      "binary": "sentin8-secrets"
+      "binary": "sentin8-secrets",
+      "telemetry_property": {
+        "slug": "secrets",
+        "name": "Sentin8:Secrets Platform Telemetry"
+      }
     }
   ]
 }
