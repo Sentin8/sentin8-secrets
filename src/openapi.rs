@@ -16,6 +16,21 @@ use crate::handlers;
 #[derive(OpenApi)]
 #[openapi(
     paths(
+        sentin8::shell::policy_check_relation,
+        sentin8::shell::policy_delete_attribute,
+        sentin8::shell::policy_delete_relation,
+        sentin8::shell::policy_delete_set,
+        sentin8::shell::policy_get_set,
+        sentin8::shell::policy_list_attributes,
+        sentin8::shell::policy_list_relations,
+        sentin8::shell::policy_list_sets,
+        sentin8::shell::policy_mode_disable,
+        sentin8::shell::policy_mode_enforce,
+        sentin8::shell::policy_mode_shadow,
+        sentin8::shell::policy_put_attribute,
+        sentin8::shell::policy_put_relation,
+        sentin8::shell::policy_put_set,
+        sentin8::shell::policy_test_set,
         handlers::put_secret,
         handlers::list_secrets,
         handlers::get_secret,
@@ -28,6 +43,14 @@ use crate::handlers;
         handlers::maintenance_prune,
         handlers::maintenance_re_encrypt,
         handlers::health_handler,
+        handlers::internal_schedules_run,
+        crate::admin_ui::get_admin_ui,
+        crate::admin_ui::get_admin_data,
+        crate::admin_ui::get_admin_data_secrets,
+        crate::admin_ui::admin_put_secret,
+        crate::admin_ui::admin_disable_secret,
+        crate::admin_ui::admin_reveal_secret,
+        crate::admin_ui::admin_rotate_secret,
     ),
     components(schemas(
         handlers::UpsertSecretRequest,
@@ -35,10 +58,13 @@ use crate::handlers;
         handlers::ResolveRequest,
         handlers::ResolveResponse,
         handlers::ReEncryptRequest,
+        crate::admin_ui::TargetEnvQuery,
+        crate::admin_ui::AdminUpsertRequest,
+        crate::admin_ui::AdminRotateRequest,
     )),
     security(),
     tags(
+        (name = "policy", description = "Shield policy administration (shared surface)"),
         (name = "secrets", description = "Sentin8:Secrets — tenant secret management (encrypted at rest, reference-based, audit-logged reveals)"),
     ),
-)]
-pub struct SecretsOpenApi;
+)]pub struct SecretsOpenApi;

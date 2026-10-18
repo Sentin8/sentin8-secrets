@@ -19,7 +19,7 @@ use serde::Deserialize;
 
 /// Resolve the effective env_id for admin operations.
 /// Priority: target_env_id query param (BFF proxy) > x-sentin8-env-id header (TLS) > token env_id.
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, utoipa::IntoParams, utoipa::ToSchema)]
 /// The targetenvquery type.
 pub struct TargetEnvQuery {
     #[serde(default)]
@@ -80,6 +80,21 @@ const WRITE_SCOPES: &[&str] = &[
 ];
 
 /// Fetch admin ui.
+#[utoipa::path(
+    get,
+    path = "/v1/admin/ui/{page}",
+    params(
+        ("page" = String, Path, description = "RFW page name"),
+        ("target_env_id" = String, Query, description = "Target env (RLS context)")
+    ),
+    responses(
+        (status = 200, description = "RFW page definition (rendered by Sentin8:Dash)", body = serde_json::Value),
+        (status = 403, description = "Caller lacks a secrets read/admin scope"),
+        (status = 404, description = "Unknown page"),
+    ),
+    security(("sentin8:secrets:read" = [])),
+    tag = "admin-ui",
+)]
 pub async fn get_admin_ui(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -255,7 +270,21 @@ pub async fn get_admin_ui(
 }
 
 /// `GET /v1/admin/{resource}` — returns a JSON array of admin data rows.
-/// Fetch admin data.
+#[utoipa::path(
+    get,
+    path = "/v1/admin/{resource}",
+    params(
+        ("resource" = String, Path, description = "Admin data resource"),
+        ("target_env_id" = String, Query, description = "Target env (RLS context)")
+    ),
+    responses(
+        (status = 200, description = "The resource's rows for the RFW table", body = serde_json::Value),
+        (status = 403, description = "Caller lacks a secrets read/admin scope"),
+        (status = 404, description = "Unknown resource"),
+    ),
+    security(("sentin8:secrets:read" = [])),
+    tag = "admin-ui",
+)]
 pub async fn get_admin_data(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -270,6 +299,17 @@ pub async fn get_admin_data(
 /// path shadows the `/v1/admin/{resource}` catch-all for GET requests
 /// (axum returns 405 instead of falling through), so the data read must be
 /// registered explicitly, mirroring the db service pattern.
+#[utoipa::path(
+    get,
+    path = "/v1/admin/secrets",
+    params(("target_env_id" = String, Query, description = "Target env (RLS context)")),
+    responses(
+        (status = 200, description = "The secrets rows for the RFW table (no plaintext)", body = serde_json::Value),
+        (status = 403, description = "Caller lacks a secrets read/admin scope"),
+    ),
+    security(("sentin8:secrets:read" = [])),
+    tag = "admin-ui",
+)]
 pub async fn get_admin_data_secrets(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -404,7 +444,7 @@ async fn admin_data(
 /// `POST /v1/admin/secrets` — store a secret from the admin form. Returns
 /// an RFW redirect to the secrets list. The value is encrypted server-side
 /// exactly like the public API (`put_secret`).
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 /// Request body for adminupsert.
 pub struct AdminUpsertRequest {
     /// The name.
@@ -421,6 +461,18 @@ pub struct AdminUpsertRequest {
 }
 
 /// Handle admin put secret.
+#[utoipa::path(
+    post,
+    path = "/v1/admin/secrets",
+    params(("target_env_id" = String, Query, description = "Target env (RLS context)")),
+    request_body = AdminUpsertRequest,
+    responses(
+        (status = 200, description = "Secret stored encrypted (RFW redirect to the list)", body = serde_json::Value),
+        (status = 403, description = "Caller lacks a secrets admin scope"),
+    ),
+    security(("sentin8:secrets:write" = [])),
+    tag = "admin-ui",
+)]
 pub async fn admin_put_secret(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -505,7 +557,7 @@ pub async fn admin_put_secret(
 }
 
 /// `POST /v1/admin/secrets/{name}/disable` — soft-disable (admin).
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 /// Request body for adminrotate.
 pub struct AdminRotateRequest {
     /// The name.
@@ -515,6 +567,20 @@ pub struct AdminRotateRequest {
 }
 
 /// Handle admin disable secret.
+#[utoipa::path(
+    post,
+    path = "/v1/admin/secrets/{name}/disable",
+    params(
+        ("name" = String, Path, description = "Secret name"),
+        ("target_env_id" = String, Query, description = "Target env (RLS context)")
+    ),
+    responses(
+        (status = 200, description = "Secret soft-disabled (RFW redirect)", body = serde_json::Value),
+        (status = 404, description = "Unknown secret name"),
+    ),
+    security(("sentin8:secrets:write" = [])),
+    tag = "admin-ui",
+)]
 pub async fn admin_disable_secret(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -556,6 +622,20 @@ pub async fn admin_disable_secret(
 /// call writes a `reads` audit row; the value is returned once and
 /// never cached by the UI.
 /// Handle admin reveal secret.
+#[utoipa::path(
+    post,
+    path = "/v1/admin/secrets/{name}/reveal",
+    params(
+        ("name" = String, Path, description = "Secret name"),
+        ("target_env_id" = String, Query, description = "Target env (RLS context)")
+    ),
+    responses(
+        (status = 200, description = "One-time reveal (audited, never cached by the UI)", body = serde_json::Value),
+        (status = 404, description = "Unknown secret name"),
+    ),
+    security(("sentin8:secrets:write" = [])),
+    tag = "admin-ui",
+)]
 pub async fn admin_reveal_secret(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -651,6 +731,18 @@ pub async fn admin_reveal_secret(
 /// `POST /v1/admin/secrets/rotate` — rotate from the admin form. The
 /// previous version is retained until the prune window.
 /// Handle admin rotate secret.
+#[utoipa::path(
+    post,
+    path = "/v1/admin/secrets/rotate",
+    params(("target_env_id" = String, Query, description = "Target env (RLS context)")),
+    request_body = AdminRotateRequest,
+    responses(
+        (status = 200, description = "New version stored (the previous retained until the prune window)", body = serde_json::Value),
+        (status = 404, description = "Unknown secret name"),
+    ),
+    security(("sentin8:secrets:write" = [])),
+    tag = "admin-ui",
+)]
 pub async fn admin_rotate_secret(
     State(state): State<AppState>,
     headers: HeaderMap,
