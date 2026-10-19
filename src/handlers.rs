@@ -6,7 +6,7 @@
 //! HTTP handlers for Sentin8:Secrets.
 //!
 //! All tenant context is resolved from the auth token's `env_id` claim
-//! (globally unique) — never from URL path segments. Plaintext secret
+//! (globally unique) - never from URL path segments. Plaintext secret
 //! values exist ONLY inside request/response handling (zeroize-on-drop
 //! `SecretValue`); the metadata surface never serializes values, and every
 //! reveal (M2M resolve or human reveal) writes a `reads` audit row.
@@ -33,17 +33,17 @@ pub struct AppState {
     /// Master key for envelope encryption (zeroized on drop).
     /// The master key.
     pub master_key: Arc<sentin8::crypto::MasterKey>,
-    /// Shield engine ( — ): the only access gate.
+    /// Shield engine ( - ): the only access gate.
     /// The policy.
     pub policy: Arc<crate::policy::Engine>,
-    /// Shared Sentin8:Policy admin surface ( — one
+    /// Shared Sentin8:Policy admin surface ( - one
     /// implementation for every service; mounted in server::routes).
     /// The admin.
     pub admin: sentin8::shield::admin::SharedAdminState,
 }
 
 // Step 5 is the ONLY access gate (.16): the scope helpers kept as
-// trivial `Ok()` so call sites and signatures stay stable — the enforced
+// trivial `Ok()` so call sites and signatures stay stable - the enforced
 // Shield scope-mirror set decides, keyed on the same action ids the call
 // sites evaluate.
 fn require_read_scope(_a: &crate::auth::AuthContext) -> Result<(), (StatusCode, String)> {
@@ -58,7 +58,7 @@ fn require_admin_scope(_a: &crate::auth::AuthContext) -> Result<(), (StatusCode,
 
 // ── Row mapping ─────────────────────────────────────────────────────────
 
-/// A fetched `secrets` row. The plaintext is NEVER part of this type —
+/// A fetched `secrets` row. The plaintext is NEVER part of this type -
 /// `value_cipher` is the v2 envelope; the metadata projection never
 /// serializes it.
 #[derive(sqlx::FromRow, Clone)]
@@ -79,7 +79,7 @@ pub struct SecretRow {
 }
 
 impl SecretRow {
-    /// Metadata projection — NEVER includes the value.
+    /// Metadata projection - NEVER includes the value.
     /// Handle metadata.
     pub fn metadata(&self) -> serde_json::Value {
         serde_json::json!({
@@ -128,7 +128,7 @@ fn db_err(e: sqlx::Error) -> (StatusCode, String) {
 /// Begin an explicit transaction with the tenant RLS context set on the
 /// same connection (secrets DESIGN §5). The context is
 /// transaction-local (`set_config(..., true)`), so every query that must
-/// see tenant rows runs inside the returned transaction — a context set on
+/// see tenant rows runs inside the returned transaction - a context set on
 /// an autocommit connection evaporates at statement commit.
 pub(crate) async fn begin_tenant_tx(
     pool: &sqlx::PgPool,
@@ -174,10 +174,10 @@ pub fn validate_name_admin(name: &str) -> Result<(), (StatusCode, String)> {
     validate_name(name)
 }
 
-// ── Event emission (inbox-first — design ) ─────────────────────────
+// ── Event emission (inbox-first - design ) ─────────────────────────
 
 /// Emit a secrets event through the shared outbox helper. Metadata-only
-/// payloads — values NEVER in event payloads. Best-effort: a failed event
+/// payloads - values NEVER in event payloads. Best-effort: a failed event
 /// is logged, never fails the domain operation. Every row carries the
 /// publisher's bearer token and subject (bus design ).
 async fn emit_event(
@@ -217,7 +217,7 @@ async fn emit_event(
 
 // ── Upsert ──────────────────────────────────────────────────────────────
 
-/// `PUT /v1/secrets/{name}` — upsert + new version.
+/// `PUT /v1/secrets/{name}` - upsert + new version.
 #[derive(Debug, serde::Deserialize, ToSchema)]
 /// Request body for upsertsecret.
 pub struct UpsertSecretRequest {
@@ -228,7 +228,7 @@ pub struct UpsertSecretRequest {
     /// The description.
     pub description: String,
     #[serde(default)]
-    /// Optional expiry — a Cron schedule emits `sentin8:secrets:secret:expiring`
+    /// Optional expiry - a Cron schedule emits `sentin8:secrets:secret:expiring`
     /// T-14d before it (secrets README §7).
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
 }
@@ -266,7 +266,7 @@ pub async fn put_secret(
     validate_name(&name)?;
     let env_id = a.env_id();
 
-    // Encrypt server-side — plaintext exists only in this request scope.
+    // Encrypt server-side - plaintext exists only in this request scope.
     let envelope =
         sentin8::crypto::seal_raw(&state.master_key, req.value.as_bytes()).map_err(|e| {
             (
@@ -275,7 +275,7 @@ pub async fn put_secret(
             )
         })?;
 
-    // Upsert with version bump — one tenant transaction carries the row
+    // Upsert with version bump - one tenant transaction carries the row
     // and its version-history row (context is transaction-local; secrets
     // DESIGN §5).
     let mut tx = begin_tenant_tx(&state.pool, env_id).await?;
@@ -343,7 +343,7 @@ pub async fn put_secret(
     )
     .await;
 
-    // Metadata only — the envelope never leaves this function.
+    // Metadata only - the envelope never leaves this function.
     Ok(axum::Json(row.metadata()).into_response())
 }
 
@@ -357,7 +357,7 @@ pub struct ListSecretsQuery {
     pub status: Option<String>,
 }
 
-/// `GET /v1/secrets` — list metadata (names, versions, status — NEVER values).
+/// `GET /v1/secrets` - list metadata (names, versions, status - NEVER values).
 #[utoipa::path(
     get,
     operation_id = "secret.list",
@@ -415,7 +415,7 @@ pub async fn list_secrets(
     Ok(axum::Json(serde_json::json!({ "secrets": items })))
 }
 
-/// `GET /v1/secrets/{name}` — metadata for one secret (no value).
+/// `GET /v1/secrets/{name}` - metadata for one secret (no value).
 #[utoipa::path(
     get,
     operation_id = "secret.get",
@@ -453,7 +453,7 @@ pub async fn get_secret(
 
 // ── Rotation + history + lifecycle ──────────────────────────────────────
 
-/// `POST /v1/secrets/{name}/rotate` — new version from body value; the old
+/// `POST /v1/secrets/{name}/rotate` - new version from body value; the old
 /// version is retained until the prune window.
 #[utoipa::path(
     post,
@@ -501,7 +501,7 @@ pub async fn rotate_secret(
     let new_version = existing.version + 1;
 
     // Rotation + version-history row in one tenant transaction (secrets
-    // DESIGN §5 — context is transaction-local).
+    // DESIGN §5 - context is transaction-local).
     let mut tx = begin_tenant_tx(&state.pool, env_id).await?;
     let updated = sqlx::query_as::<_, SecretRow>(
         "UPDATE secrets SET value_cipher = $3, key_version = $4, version = $5, status = 'active', updated_at = now()
@@ -551,7 +551,7 @@ pub async fn rotate_secret(
     Ok(axum::Json(updated.metadata()))
 }
 
-/// `GET /v1/secrets/{name}/history` — version metadata list (no values).
+/// `GET /v1/secrets/{name}/history` - version metadata list (no values).
 #[utoipa::path(
     get,
     operation_id = "secret.history",
@@ -621,7 +621,7 @@ pub async fn secret_history(
     ))
 }
 
-/// `DELETE /v1/secrets/{name}` — soft-disable (status → disabled). Hard
+/// `DELETE /v1/secrets/{name}` - soft-disable (status → disabled). Hard
 /// delete is not exposed (values are purge-able via version prune only).
 #[utoipa::path(
     delete,
@@ -683,7 +683,7 @@ pub async fn delete_secret(
 
 // ── Reveal (human, admin-gated, audit-logged) ───────────────────────────
 
-/// `GET /v1/secrets/{name}/reveal` — return the value. Admin scope; every
+/// `GET /v1/secrets/{name}/reveal` - return the value. Admin scope; every
 /// call writes a `reads` audit row.
 #[utoipa::path(
     get,
@@ -728,7 +728,7 @@ pub async fn reveal_secret(
 
 // ── Machine resolution (M2M, audit-logged) ──────────────────────────────
 
-/// `POST /v1/secrets/resolve` — machine resolution. Body:
+/// `POST /v1/secrets/resolve` - machine resolution. Body:
 /// `{"ref": "secrets://<name>"}` → `{"value": ..., "version": ...}`.
 /// Standard consumption path for services; audit row per call.
 #[derive(Debug, serde::Deserialize, ToSchema)]
@@ -803,7 +803,7 @@ pub async fn resolve_secret(
 /// plaintext lives only inside this function scope (zeroized via
 /// `SecretValue` drop). Audit-before-response (secrets DESIGN §5): the
 /// `reads` row is INSERTed inside the SAME tenant transaction as the
-/// value SELECT — an audit failure aborts the read (500), the value is
+/// value SELECT - an audit failure aborts the read (500), the value is
 /// never returned unaudited.
 async fn resolve_internal(
     state: &AppState,
@@ -846,7 +846,7 @@ async fn resolve_internal(
             )
         })?;
 
-    // Audit INSIDE the same transaction as the value read — a failed
+    // Audit INSIDE the same transaction as the value read - a failed
     // INSERT rolls the whole read back (audit-before-response).
     sqlx::query(
         "INSERT INTO reads (secret_id, version, reader_subject, reader_service, reader_type, env_id)
@@ -861,7 +861,7 @@ async fn resolve_internal(
     .execute(&mut *tx)
     .await
     .map_err(|e| {
-        tracing::error!(error = %e, secret_id = %row.id, "secrets: reveal audit INSERT FAILED — read denied (audit-before-response)");
+        tracing::error!(error = %e, secret_id = %row.id, "secrets: reveal audit INSERT FAILED - read denied (audit-before-response)");
         (StatusCode::INTERNAL_SERVER_ERROR, "audit failure".to_string())
     })?;
     tx.commit().await.map_err(db_err)?;
@@ -875,7 +875,7 @@ async fn resolve_internal(
 
 // ── Reveal audit trail (admin) ──────────────────────────────────────────
 
-/// `GET /v1/secrets/{name}/reads` — reveal audit trail (admin).
+/// `GET /v1/secrets/{name}/reads` - reveal audit trail (admin).
 #[utoipa::path(
     get,
     operation_id = "secret.reads",
@@ -946,7 +946,7 @@ pub async fn secret_reads(
     ))
 }
 
-/// `GET /v1/health` — custom payload (shell supplies the standard one too).
+/// `GET /v1/health` - custom payload (shell supplies the standard one too).
 #[utoipa::path(
     get,
     operation_id = "secrets.health",
@@ -970,7 +970,7 @@ pub async fn health_handler() -> impl IntoResponse {
 
 // ── Maintenance: version prune + master-key re-encrypt ──
 
-/// `POST /v1/secrets/maintenance/prune` — delete versions older than the
+/// `POST /v1/secrets/maintenance/prune` - delete versions older than the
 /// current one past the retention window (default 7d; `SENTIN8_SECRETS_PRUNE_DAYS`).
 /// Idempotent; safe to call from Sentin8:Cron (proxy-back). The reveal-audit
 /// table is NEVER pruned (security-relevant history).
@@ -1009,7 +1009,7 @@ pub async fn maintenance_prune(
 
     // Delete non-current versions whose created_at is older than the window.
     // Pruning runs within the caller's env (context set via the tenant
-    // transaction — consistent with every other handler); a full-fleet
+    // transaction - consistent with every other handler); a full-fleet
     // sweep calls this per env via the scheduled cron proxy-back.
     let mut tx = begin_tenant_tx(&state.pool, a.env_id()).await?;
     let result = sqlx::query(
@@ -1035,7 +1035,7 @@ pub async fn maintenance_prune(
     })))
 }
 
-/// `POST /v1/secrets/maintenance/re-encrypt` — re-encrypt rows whose
+/// `POST /v1/secrets/maintenance/re-encrypt` - re-encrypt rows whose
 /// `key_version` is below the current master-key epoch (design
 /// rotation lever). Read old / write new per row; idempotent + resumable
 /// (rows keep their old `key_version` until successfully re-written).
@@ -1128,7 +1128,7 @@ pub async fn maintenance_re_encrypt(
             }
         };
         // Update the main row + its current version-history row (same tenant
-        // transaction; rows keep their old key_version until re-written —
+        // transaction; rows keep their old key_version until re-written -
         // idempotent + resumable).
         match sqlx::query(
             "UPDATE secrets SET value_cipher = $3, key_version = $4, updated_at = now()
@@ -1173,11 +1173,11 @@ pub async fn maintenance_re_encrypt(
 
 // ── Cron proxy-back (secrets DESIGN §10) ────────────────────────────────
 
-/// `POST /v1/internal/schedules/run` — Sentin8:Cron proxy-back target.
+/// `POST /v1/internal/schedules/run` - Sentin8:Cron proxy-back target.
 /// Maintenance sweeps that must not depend on a user request:
-/// (a) `expiry-scan` — emits `sentin8:secrets:secret:expiring` for every
+/// (a) `expiry-scan` - emits `sentin8:secrets:secret:expiring` for every
 /// secret whose `expires_at` lands within the next 14 days (secrets
-/// README §7), (b) `version-prune` — drops prunable non-current versions
+/// README §7), (b) `version-prune` - drops prunable non-current versions
 /// using the service's own prune window (SECRETS-2, secrets DESIGN §10:
 /// the schedule is declared at boot next to `expiry-scan`). Authenticated
 /// by the cron ticker's M2M token (verified like any other principal
@@ -1213,7 +1213,7 @@ pub async fn internal_schedules_run(
         .ok_or((StatusCode::BAD_REQUEST, "missing env_id".into()))?;
 
     // (b) version-prune (SECRETS-2): drop prunable non-current versions for
-    // the schedule's env — the same predicate the admin endpoint runs, but
+    // the schedule's env - the same predicate the admin endpoint runs, but
     // driven by Cron so the window holds without a user request. The prune
     // window disabled (`prune_days <= 0`) is a no-op, reported as disabled.
     if schedule_type == "version-prune" {

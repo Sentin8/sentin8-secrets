@@ -16,8 +16,8 @@ pub async fn build_state(
     core: sentin8::shell::ServiceCore,
 ) -> anyhow::Result<crate::handlers::AppState> {
     let config = crate::config::SecretsConfig::from_env();
-    // ── Sentin8:Policy (— shell-owned boot): consume the
-    // engine the shell booted in step 8 — no second engine, consumer, or
+    // ── Sentin8:Policy (- shell-owned boot): consume the
+    // engine the shell booted in step 8 - no second engine, consumer, or
     // DCR registration here.
     let policy_engine = core.admin.policy.clone();
 
@@ -40,7 +40,7 @@ pub async fn build_state(
 /// Add this service's routes onto the shell-provided router. The shell
 /// owns the boot sequence, state binding, OpenAPI merge and the standard
 /// middleware stack; this adds ONLY routes (including the service's own
-/// `/v1/health` — custom payload).
+/// `/v1/health` - custom payload).
 /// Handle routes.
 pub fn routes(
     router: axum::Router<crate::handlers::AppState>,
@@ -60,7 +60,7 @@ pub fn routes(
         .route("/v1/secrets/{name}/reveal", get(handlers::reveal_secret))
         .route("/v1/secrets/{name}/reads", get(handlers::secret_reads))
         .route("/v1/secrets/resolve", post(handlers::resolve_secret))
-        // Cron proxy-back target (secrets DESIGN §10 — expiry scan).
+        // Cron proxy-back target (secrets DESIGN §10 - expiry scan).
         .route(
             "/v1/internal/schedules/run",
             post(handlers::internal_schedules_run),
@@ -93,7 +93,7 @@ pub fn routes(
             "/v1/admin/secrets/rotate",
             post(crate::admin_ui::admin_rotate_secret),
         )
-        // ── Sentin8:Policy admin API ( — shared implementation,
+        // ── Sentin8:Policy admin API ( - shared implementation,
         // one surface per service; handlers are generic over this AppState).
         .route(
             "/v1/admin/policy-sets",
@@ -139,7 +139,7 @@ pub fn routes(
         )
 }
 
-/// Shared policy-admin surface accessor — the shared
+/// Shared policy-admin surface accessor - the shared
 /// handlers extract this service's admin state via [`HasPolicyAdmin`].
 impl sentin8::shield::admin::HasPolicyAdmin for AppState {
     fn policy_admin(&self) -> &sentin8::shield::admin::SharedAdminState {

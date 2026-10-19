@@ -31,7 +31,7 @@ async fn provision() -> Option<(PgPool, uuid::Uuid)> {
     }
     let env_id = uuid::Uuid::new_v4();
     // Create a fake env row (RLS needs the tenant present for context-set,
-    // but sentin8_set_tenant_context only sets config — no FK check needed).
+    // but sentin8_set_tenant_context only sets config - no FK check needed).
     Some((pool, env_id))
 }
 
@@ -60,7 +60,7 @@ fn master_key() -> sentin8::crypto::MasterKey {
 
 #[tokio::test]
 async fn sec_secrets_envelope_roundtrip_and_metadata_shape() {
-    // Pure-crypto round trip — no DB needed (security property pin).
+    // Pure-crypto round trip - no DB needed (security property pin).
     let mk = master_key();
     let plaintext = b"totally-secret-value";
     let envelope = sentin8::crypto::seal_raw(&mk, plaintext).expect("seal");
@@ -115,7 +115,7 @@ async fn sec_secrets_upsert_bumps_version_and_writes_history() {
     assert_eq!(v1.1, 1);
     assert_eq!(v2.1, 2);
 
-    // History rows are written by the handler alongside each write —
+    // History rows are written by the handler alongside each write -
     // mirror that here (one row per version).
     for (ver, val) in [(1, b"one".as_slice()), (2, b"two".as_slice())] {
         sqlx::query(
@@ -153,7 +153,7 @@ async fn sec_secrets_upsert_bumps_version_and_writes_history() {
     assert!(!String::from_utf8_lossy(&row.1).contains("two"));
 
     tx.rollback().await.ok(); // transaction-scoped context dies with it
-                              // Cleanup (context + delete on the SAME transaction — FORCE RLS).
+                              // Cleanup (context + delete on the SAME transaction - FORCE RLS).
     let mut ctx = pool.begin().await.expect("cleanup tx");
     sqlx::query("SELECT sentin8_set_tenant_context($1)")
         .bind(env_id)
@@ -177,14 +177,14 @@ async fn sec_secrets_rls_cross_env_isolation() {
     };
     let mk = master_key();
 
-    // RLS is enforced against NON-superuser roles only — connect as the
+    // RLS is enforced against NON-superuser roles only - connect as the
     // service role (`sentin8_secrets_service`, created by the init grants
     // step) the way the real service does.
     let svc_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://sentin8@localhost:5432/sentin8".into());
     let svc_url = svc_url.replace("sentin8:sentin8", "sentin8_secrets_service:oauth");
     let Ok(svc) = PgPool::connect(&svc_url).await else {
-        // Service role not reachable (fresh DB) — RLS verified at handler level.
+        // Service role not reachable (fresh DB) - RLS verified at handler level.
         return;
     };
 
@@ -210,7 +210,7 @@ async fn sec_secrets_rls_cross_env_isolation() {
 
     // A service-role connection with env B context sees only env B's row.
     // Context must be set and queried on the SAME connection (principles
-    // §4.3d) — use one explicit transaction.
+    // §4.3d) - use one explicit transaction.
     let mut tx = svc.begin().await.expect("svc tx");
     sqlx::query("SELECT sentin8_set_tenant_context($1)")
         .bind(env_b)
@@ -224,7 +224,7 @@ async fn sec_secrets_rls_cross_env_isolation() {
     tx.rollback().await.ok();
     assert_eq!(visible, 1, "env B must see only its own row (RLS)");
 
-    // Cleanup (as superuser, context on the SAME connection — FORCE RLS
+    // Cleanup (as superuser, context on the SAME connection - FORCE RLS
     // applies even to the table owner).
     for env in [env_a, env_b] {
         let mut tx = pool.begin().await.expect("cleanup tx");
@@ -317,7 +317,7 @@ async fn sec_secrets_reveal_writes_audit_row() {
 
 /// Pinned invariant (secrets DESIGN §5, cross-cutting CC-5): under FORCE
 /// RLS, a service-role connection WITHOUT tenant context must see zero
-/// rows and must fail INSERTs — the fail-closed posture the handler
+/// rows and must fail INSERTs - the fail-closed posture the handler
 /// transactions (`begin_tenant_tx`) rely on. Runtime-skip when the
 /// service role is not provisioned.
 #[tokio::test]
@@ -331,7 +331,7 @@ async fn sec_secrets_rls_fails_closed_without_context() {
         .unwrap_or_else(|_| "postgres://sentin8@localhost:5432/sentin8".into());
     let svc_url = svc_url.replace("sentin8:sentin8", "sentin8_secrets_service:oauth");
     let Ok(svc) = PgPool::connect(&svc_url).await else {
-        return; // Service role not reachable (fresh DB) — skipped.
+        return; // Service role not reachable (fresh DB) - skipped.
     };
 
     // Seed one row in env A (superuser, context on the same connection).

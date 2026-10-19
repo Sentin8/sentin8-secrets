@@ -65,6 +65,6 @@ use crate::handlers;
     security(),
     tags(
         (name = "policy", description = "Shield policy administration (shared surface)"),
-        (name = "secrets", description = "Sentin8:Secrets — tenant secret management (encrypted at rest, reference-based, audit-logged reveals)"),
+        (name = "secrets", description = "Sentin8:Secrets - tenant secret management (encrypted at rest, reference-based, audit-logged reveals)"),
     ),
 )]pub struct SecretsOpenApi;

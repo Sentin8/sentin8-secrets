@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright Contributors to the Sentin8:Secrets
 // SPDX-License-Identifier: Apache-2.0
 
-//! Sentin8:Secrets — tenant secret management service.
+//! Sentin8:Secrets - tenant secret management service.
 //!
 //! Stores tenant secret material encrypted at rest (AES-256-GCM envelopes
 //! via `sentin8-crypto`), serves it by reference, versions + rotates it,

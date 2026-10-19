@@ -3,7 +3,7 @@
 -- SPDX-FileCopyrightText: Copyright Contributors to the Sentin8:Secrets
 -- SPDX-License-Identifier: Apache-2.0
 
--- Sentin8:Secrets — tenant secret management service.
+-- Sentin8:Secrets - tenant secret management service.
 -- Design: sentin8/design/sentin8-sentin8-secrets-technical-design.md §4.2.
 --
 -- Secret material is stored ONLY as `v2:` AES-256-GCM envelopes
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS secrets.secrets (
 CREATE INDEX IF NOT EXISTS idx_secrets_env ON secrets.secrets (env_id);
 CREATE INDEX IF NOT EXISTS idx_secrets_env_name ON secrets.secrets (env_id, name);
 
--- Version history — append-only, enables rotation + rollback (§4.2).
+-- Version history - append-only, enables rotation + rollback (§4.2).
 CREATE TABLE IF NOT EXISTS secrets.versions (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     secret_id       UUID NOT NULL REFERENCES secrets.secrets(id) ON DELETE CASCADE,
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS secrets.versions (
 
 CREATE INDEX IF NOT EXISTS idx_secrets_versions_secret ON secrets.versions (secret_id, version DESC);
 
--- Reveal audit — who read which version, when. Append-only, NEVER pruned
+-- Reveal audit - who read which version, when. Append-only, NEVER pruned
 -- (security-relevant history, design §4.2).
 CREATE TABLE IF NOT EXISTS secrets.reads (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS secrets.reads (
 CREATE INDEX IF NOT EXISTS idx_secrets_reads_secret ON secrets.reads (secret_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_secrets_reads_env ON secrets.reads (env_id);
 
--- ── Row-Level Security (mandatory hardening — principles §4.3d) ───────────
+-- ── Row-Level Security (mandatory hardening - principles §4.3d) ───────────
 
 ALTER TABLE secrets.secrets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE secrets.secrets FORCE ROW LEVEL SECURITY;
@@ -75,7 +75,7 @@ ALTER TABLE secrets.versions FORCE ROW LEVEL SECURITY;
 ALTER TABLE secrets.reads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE secrets.reads FORCE ROW LEVEL SECURITY;
 
--- Standard tenant match policy on every secrets table (isolation only —
+-- Standard tenant match policy on every secrets table (isolation only -
 -- never business logic; db-design §7.0 binding rule).
 DROP POLICY IF EXISTS secrets_select ON secrets.secrets;
 CREATE POLICY secrets_select ON secrets.secrets
@@ -191,7 +191,7 @@ CREATE POLICY audit_journal_dml ON secrets.audit_journal
     WITH CHECK (sentin8_context_initialized() AND env_id = sentin8_current_env_id());
 
 
--- ── Schema grants (service-owned — the 2026-10-03 ownership pass) ─────
+-- ── Schema grants (service-owned - the 2026-10-03 ownership pass) ─────
 -- This service's own schema: USAGE for its role (platform.sql no longer
 -- seeds per-service USAGE; the service declares it here).
 GRANT USAGE ON SCHEMA secrets TO sentin8_secrets_service;

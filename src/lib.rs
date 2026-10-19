@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright Contributors to the Sentin8:Secrets
 // SPDX-License-Identifier: Apache-2.0
 
-//! Sentin8:Secrets service library — re-exports for tests.
+//! Sentin8:Secrets service library - re-exports for tests.
 
 #![deny(missing_docs)]
 
@@ -13,11 +13,11 @@ pub mod admin_ui;
 pub mod auth;
 /// Environment configuration.
 pub mod config;
-/// HTTP handlers — secret CRUD, reveal, history, maintenance.
+/// HTTP handlers - secret CRUD, reveal, history, maintenance.
 pub mod handlers;
 /// OpenAPI spec assembly.
 pub mod openapi;
-/// Shield (Sentin8:Policy) integration — shared bridge re-exports.
+/// Shield (Sentin8:Policy) integration - shared bridge re-exports.
 pub mod policy;
 /// Service self-registration declarations.
 pub mod registration;

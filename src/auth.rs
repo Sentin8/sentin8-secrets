@@ -25,7 +25,7 @@ pub async fn verify_token(
 
 /// Extract the raw bearer token (compact JWT) from the Authorization
 /// header, without verifying. Used for the bus-inbox publisher columns
-/// (`publisher_id_token`) — the row already went through `verify_token`,
+/// (`publisher_id_token`) - the row already went through `verify_token`,
 /// so this is audit context, not an authorization decision.
 pub fn raw_bearer_token(headers: &HeaderMap) -> Option<String> {
     headers

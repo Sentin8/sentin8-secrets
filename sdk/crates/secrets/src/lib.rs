@@ -112,7 +112,7 @@ pub enum SecretError {
 
 // ── Resolver backends ───────────────────────────────────────────────────
 
-/// `env://` backend — resolves against environment variables
+/// `env://` backend - resolves against environment variables
 /// (`SENTIN8_SECRETS_<SCREAMING_PATH>`). Dev-bootstrap backend.
 pub struct EnvResolver;
 
@@ -129,9 +129,9 @@ impl SecretResolver for EnvResolver {
     }
 }
 
-/// `file://` backend — reads the raw file at the reference path (relative
+/// `file://` backend - reads the raw file at the reference path (relative
 /// paths resolve against `SENTIN8_SECRETS_DIR`, defaulting to
-/// `/etc/sentin8/secrets` — the dir captain propagates).
+/// `/etc/sentin8/secrets` - the dir captain propagates).
 pub struct FileResolver {
     root: std::path::PathBuf,
 }
@@ -149,7 +149,7 @@ impl FileResolver {
 #[async_trait]
 impl SecretResolver for FileResolver {
     async fn resolve(&self, reference: &SecretRef) -> Result<SecretValue, SecretError> {
-        // Path traversal guard — refuse absolute paths and ParentDir
+        // Path traversal guard - refuse absolute paths and ParentDir
         // components (the storage adapter's `safe_path` pattern).
         if reference.path.starts_with('/')
             || std::path::Path::new(&reference.path).components().any(|c| {
@@ -168,9 +168,9 @@ impl SecretResolver for FileResolver {
     }
 }
 
-/// `secrets://` backend — resolves via the Sentin8:Secrets HTTP resolve
+/// `secrets://` backend - resolves via the Sentin8:Secrets HTTP resolve
 /// endpoint (`POST /v1/secrets/resolve`). auth DESIGN §4.3f:
-/// the standard platform path is **certificate-presenting** — the caller's
+/// the standard platform path is **certificate-presenting** - the caller's
 /// Acme-issued client certificate authenticates at the TLS handshake; no
 /// bearer token exists on this path.
 pub struct ServiceResolver {
@@ -216,7 +216,7 @@ pub async fn resolve_credential(credential_ref: &str) -> Result<SecretValue, Sec
     match reference.backend.as_str() {
         "secrets" | "service" | "sentin8-secrets" => {
             // the platform path presents the calling workload's
-            // certificate — resolved from the shared m2m identity helpers.
+            // certificate - resolved from the shared m2m identity helpers.
             // A missing identity surfaces as a Backend error (fail-closed;
             // the caller diagnoses provisioning, never a silent fallback).
             let base = std::env::var("SENTIN8_SECRETS_URL")

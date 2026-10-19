@@ -1,4 +1,4 @@
-# Sentin8:Secrets — Detailed Design Document
+# Sentin8:Secrets - Detailed Design Document
 
 ## 1. Scope & Context
 
@@ -6,8 +6,8 @@ Sentin8:Secrets is the platform's secret-reference store: provider
 credentials, API keys, and webhook signing secrets are envelope-encrypted
 at rest (AES-256-GCM under a 32-byte master key), addressed by name
 (`stripe/api_key`), versioned on rotation, and revealed only through two
-audited paths — the programmatic `POST /v1/secrets/resolve` and the
-admin `reveal` — with an append-only reveal audit trail that is never
+audited paths - the programmatic `POST /v1/secrets/resolve` and the
+admin `reveal` - with an append-only reveal audit trail that is never
 pruned.
 
 - **Owns** (schema `secrets`): `secrets` (current values), `versions`
@@ -46,7 +46,7 @@ graph TD
     OB -- "relay" --> BUS["sentin8:bus"]
 ```
 
-Trust boundary: plaintext exists only inside a request's scope —
+Trust boundary: plaintext exists only inside a request's scope -
 `SecretValue` zeroizes on drop, the master key is a `Zeroizing` wrapper
 that never prints, logs, or persists, and metadata surfaces are
 value-free by construction.
@@ -115,7 +115,7 @@ sequenceDiagram
         H-->>C: 500 decrypt failed
     end
     H->>RD: INSERT reads row (reader_subject, service, type)
-    Note over H: audit failure logs "deny-by-design triage required"<br/>(response still returns — best-effort audit)
+    Note over H: audit failure logs "deny-by-design triage required"<br/>(response still returns - best-effort audit)
     H->>Z: wrap plaintext (zeroized after response)
     H-->>C: value (never logged, never in metadata)
 ```
@@ -164,15 +164,15 @@ erDiagram
     }
 ```
 
-- `secrets.secrets` — `UNIQUE (env_id, name)`; RLS FORCE with 4
-  env-scoped policies; no plaintext column — `value_cipher` only.
-- `secrets.versions` — append-only (`UNIQUE (secret_id, version)`; select
+- `secrets.secrets` - `UNIQUE (env_id, name)`; RLS FORCE with 4
+  env-scoped policies; no plaintext column - `value_cipher` only.
+- `secrets.versions` - append-only (`UNIQUE (secret_id, version)`; select
   + insert + delete policies, no update); previous versions survive the
   prune window so consumers mid-rotation keep resolving.
-- `secrets.reads` — append-only and **never pruned**: every reveal (m2m
+- `secrets.reads` - append-only and **never pruned**: every reveal (m2m
   resolve, user reveal, admin reveal) lands here with the reader's
   subject/service/type.
-- `secrets.outbox` / `secrets.audit_journal` — generated DBX tables.
+- `secrets.outbox` / `secrets.audit_journal` - generated DBX tables.
 
 ```mermaid
 stateDiagram-v2
@@ -212,7 +212,7 @@ flowchart LR
 
 Event types: `sentin8:secrets:secret:created` (`{secret_id, name,
 version}`), `:updated` / `:rotated` (`{secret_id, name, version,
-previous_version}`), `:disabled` (`{secret_id, name}`) — values never.
+previous_version}`), `:disabled` (`{secret_id, name}`) - values never.
 
 ## 5. Cross-Cutting Concerns
 
@@ -226,13 +226,13 @@ previous_version}`), `:disabled` (`{secret_id, name}`) — values never.
 - **Audit journaling**: reveal audit (`secrets.reads`, never pruned) +
   `audit_journal` for shared decisions.
 - **Graceful drain / TLS posture**: shell-owned; the master key lives
-  only in process memory (Zeroizing) — a restart re-loads it from env.
+  only in process memory (Zeroizing) - a restart re-loads it from env.
 
 ## 6. Failure Modes & Recovery
 
 ```mermaid
 flowchart TD
-    BOOT[boot: master key load] -->|missing/invalid non-dev| PANIC[panic — refuse to start]
+    BOOT[boot: master key load] -->|missing/invalid non-dev| PANIC[panic - refuse to start]
     BOOT -->|dev mode| DEV[ephemeral OsRng key + loud warning<br/>values unreadable after restart]
     RES[resolve] -->|disabled| R404[404 secret disabled]
     RES -->|decrypt fail| R500[500 decrypt failed]
@@ -247,7 +247,7 @@ flowchart TD
   `maintenance/re-encrypt` lazily re-wraps old-key rows (per-row
   continue-on-failure, resumable); the previous-version history row is
   re-wrapped when it is the current version.
-- **Version rotation keeps previous values** through the prune window —
+- **Version rotation keeps previous values** through the prune window -
   consumers mid-upgrade keep resolving.
 - **Event emission failure** only warns (metadata-only events are
   re-derivable from the row).
@@ -268,7 +268,7 @@ graph LR
     POOL[("PgPool ≤ 3")]
 ```
 
-- No service-owned background tasks — the daily version-prune sweep is
+- No service-owned background tasks - the daily version-prune sweep is
   a Sentin8:Cron schedule registered at boot next to the expiry scan;
   outbox relay, policy hot-reload, and metrics publishers
   are shell-owned.
@@ -284,7 +284,7 @@ graph LR
    Debug never prints material.
 2. **Metadata is value-free by construction**: `SecretRow::metadata()`
    serializes id/name/description/version/key_version/status/created_by/
-   env_id/timestamps/ref — `value_cipher` never leaves the resolve path.
+   env_id/timestamps/ref - `value_cipher` never leaves the resolve path.
 3. **Every reveal is audited** (m2m / user / admin) into the append-only
    `reads` table, which is never pruned.
 4. **Envelope discipline**: `v2:` prefix + fresh 12-byte nonce per seal +
@@ -292,7 +292,7 @@ graph LR
    non-deterministic ciphertext.
 5. **Names fail closed**: non-empty, ≤256 chars, `[a-zA-Z0-9/_-]`, no
    empty segments (traversal refused).
-6. **Disabled refusal**: disabled secrets resolve/reveal as 404 —
+6. **Disabled refusal**: disabled secrets resolve/reveal as 404 -
    disabled state cannot be distinguished from absence by callers.
 7. **Rotation via versioning, not overwrite**: history rows + version
    counters are append-only; delete is soft-disable only (hard delete is

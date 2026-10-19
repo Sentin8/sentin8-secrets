@@ -1,4 +1,4 @@
-# Design Doc: Sentin8:Secrets — Secret Reference Store & Resolver
+# Design Doc: Sentin8:Secrets - Secret Reference Store & Resolver
 
 ## 1. Summary
 
@@ -13,12 +13,12 @@ runs via Cron proxy-back.
 ## 2. Motivation
 
 - **Secret references only.** Application tables store
-  `backend://path` references, never credential material — a database
+  `backend://path` references, never credential material - a database
   dump or backup must never contain a usable provider key, PAN, PIN,
   or OAuth client secret.
 - **Two access paths, both audited.** Machines resolve values
   programmatically (with a work-load-scoped token); humans reveal for
-  inspection — both write `reads` audit rows. An unaudited reveal is
+  inspection - both write `reads` audit rows. An unaudited reveal is
   the classic secret-store failure.
 - **Zeroize-on-drop plaintext.** Plaintext values live only inside
   request/response handling (the `SecretValue` wrapper zeroes on
@@ -52,33 +52,33 @@ graph TD
     end
 ```
 
-- **Tenant context** — resolved from the auth token's `env_id` claim
+- **Tenant context** - resolved from the auth token's `env_id` claim
   (globally unique), never from URL path segments; cross-env access is
   validated at the authorization layer.
-- **Envelope** — `value_cipher` BYTEA carries the AES-256-GCM envelope
+- **Envelope** - `value_cipher` BYTEA carries the AES-256-GCM envelope
   (`v2:` prefix via `sentin8-crypto`) with a `key_version` column;
   `SENTIN8_AUTH_MASTER_KEY` is the master key source (same source as
   auth signing keys), with a dev-only deterministic key escape hatch
   for tests.
-- **Reveal audit** — every M2M resolve and human reveal records who,
+- **Reveal audit** - every M2M resolve and human reveal records who,
   what, and when (`reads` table surfaced in the admin UI history
   page).
-- **Rotation** — `rotate_secret` bumps the version and retains the
+- **Rotation** - `rotate_secret` bumps the version and retains the
   previous one until the prune window; resolve returns the active
   version.
 
 ## 4. Key Traits and Data Structures
 
-- **`SecretRow`** — the stored record: id, name, description,
+- **`SecretRow`** - the stored record: id, name, description,
   `value_cipher` (envelope bytes), `key_version`, `version`, status,
-  creator, env, timestamps — with a `metadata()` projection that
+  creator, env, timestamps - with a `metadata()` projection that
   NEVER includes the value.
-- **`UpsertSecretRequest`** — create/update: name (validated: admin
+- **`UpsertSecretRequest`** - create/update: name (validated: admin
   charset), description, plaintext value (accepted once, encrypted
   immediately).
-- **`ResolveRequest` / `ResolveResponse`** — the M2M contract: name →
+- **`ResolveRequest` / `ResolveResponse`** - the M2M contract: name →
   plaintext value (returned once, never logged).
-- **Maintenance handlers** — `prune` (remove expired versions) and
+- **Maintenance handlers** - `prune` (remove expired versions) and
   `re-encrypt` (rewrap to the current key version). The daily
   `secrets-version-prune` schedule (registered at boot, 05:30) drives
   prune through the Cron proxy-back `/v1/internal/schedules/run`
@@ -93,7 +93,7 @@ graph TD
   recoverable for providers).
 - **Two reveal paths, both audited.** Machines resolve (the common
   path, token-scoped); humans reveal rarely. Every reveal writes an
-  audit row — a secret read without a record is a compromise signal
+  audit row - a secret read without a record is a compromise signal
   missed. The alternative (unaudited reads) fails compliance review.
 - **Tenant context from claims only.** URL path segments are attacker-
   controlled; the token's `env_id` (globally unique, TLS-verified) is
@@ -101,7 +101,7 @@ graph TD
   authorization layer, never defaulted.
 - **Metadata value-free by construction.** The `metadata()` projection
   and list endpoints serialize only id/name/description/version/status
-  — a future field addition cannot accidentally leak the cipher text
+  - a future field addition cannot accidentally leak the cipher text
   because the value never enters the projection.
 - **Rotation via versioning, not overwrite.** The previous version is
   retained until the prune window: consumers mid-upgrade keep
@@ -109,7 +109,7 @@ graph TD
   break readers that cached the old value.
 - **Maintenance via Cron proxy-back.** Prune is scheduled by
   Sentin8:Cron (the daily `secrets-version-prune` schedule registered
-  at boot, 05:30) and calls back the internal proxy-back endpoint —
+  at boot, 05:30) and calls back the internal proxy-back endpoint -
   the service owns its domain logic; Cron owns the clock. Re-encrypt
   stays a manual post-rotation step.
 - **Zeroize-on-drop `SecretValue`.** Plaintext buffers are wiped when
@@ -131,7 +131,7 @@ graph TD
   - Every reveal (M2M or human) writes a `reads` audit row before the
     response returns.
   - Names are validated (`validate_name_admin`): charset, length,
-    reserved prefixes — rejection is fail-closed.
+    reserved prefixes - rejection is fail-closed.
   - Rotation retains the previous version until the prune window;
     `maintenance_prune` (Cron proxy-back) removes expired versions.
   - Re-encrypt rewraps rows to the current key version; old-version

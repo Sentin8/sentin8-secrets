@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright Contributors to the Sentin8:Secrets
 // SPDX-License-Identifier: Apache-2.0
 
-//! Sentin8:Secrets Admin UI handlers — RFW definitions.
+//! Sentin8:Secrets Admin UI handlers - RFW definitions.
 //! Served from `GET /v1/admin/ui/{page}`, rendered by Sentin8:Dash at runtime.
 
 use crate::handlers::AppState;
@@ -26,7 +26,7 @@ pub struct TargetEnvQuery {
     target_env_id: Option<String>,
 }
 
-/// Resolve the effective env and authorize it ( — cross-env access is
+/// Resolve the effective env and authorize it ( - cross-env access is
 /// validated at the authorization layer): if the resolved env differs from
 /// the token env, the caller must be a platform/env admin. Otherwise 403.
 fn resolve_env_id(
@@ -108,7 +108,7 @@ pub async fn get_admin_ui(
         "overview" => AdminPage::new("Secrets Overview")
             .widget(card(
                 "Secret Management",
-                "Tenant secrets are encrypted at rest (AES-256-GCM envelopes), versioned on every write, and every reveal is audit-logged. Values are masked by default — use the Reveal row action for an explicit, logged reveal.",
+                "Tenant secrets are encrypted at rest (AES-256-GCM envelopes), versioned on every write, and every reveal is audit-logged. Values are masked by default - use the Reveal row action for an explicit, logged reveal.",
             ))
             .build(),
         "secrets" => AdminPage::new("Secrets")
@@ -269,7 +269,7 @@ pub async fn get_admin_ui(
     ))
 }
 
-/// `GET /v1/admin/{resource}` — returns a JSON array of admin data rows.
+/// `GET /v1/admin/{resource}` - returns a JSON array of admin data rows.
 #[utoipa::path(
     get,
     path = "/v1/admin/{resource}",
@@ -295,7 +295,7 @@ pub async fn get_admin_data(
     admin_data(state, headers, q, name_q, resource).await
 }
 
-/// GET alias for `/v1/admin/secrets` — the POST-only literal on the same
+/// GET alias for `/v1/admin/secrets` - the POST-only literal on the same
 /// path shadows the `/v1/admin/{resource}` catch-all for GET requests
 /// (axum returns 405 instead of falling through), so the data read must be
 /// registered explicitly, mirroring the db service pattern.
@@ -441,7 +441,7 @@ async fn admin_data(
     Ok(Json(serde_json::Value::Array(rows)))
 }
 
-/// `POST /v1/admin/secrets` — store a secret from the admin form. Returns
+/// `POST /v1/admin/secrets` - store a secret from the admin form. Returns
 /// an RFW redirect to the secrets list. The value is encrypted server-side
 /// exactly like the public API (`put_secret`).
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -455,7 +455,7 @@ pub struct AdminUpsertRequest {
     /// The description.
     pub description: Option<String>,
     #[serde(default)]
-    /// Optional expiry — emits `sentin8:secrets:secret:expiring` T-14d
+    /// Optional expiry - emits `sentin8:secrets:secret:expiring` T-14d
     /// before it via the cron schedule (secrets README §7).
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
 }
@@ -494,7 +494,7 @@ pub async fn admin_put_secret(
             )
         })?;
 
-    // The RLS context is transaction-local — the INSERT and its versions row
+    // The RLS context is transaction-local - the INSERT and its versions row
     // must share one tenant transaction (secrets DESIGN §5).
     let mut tx = crate::handlers::begin_tenant_tx(&state.pool, env_uuid).await?;
     let row = sqlx::query_as::<_, (uuid::Uuid, i32)>(
@@ -556,7 +556,7 @@ pub async fn admin_put_secret(
     Ok(Json(AdminUiResponse::redirect("secrets")))
 }
 
-/// `POST /v1/admin/secrets/{name}/disable` — soft-disable (admin).
+/// `POST /v1/admin/secrets/{name}/disable` - soft-disable (admin).
 #[derive(Deserialize, utoipa::ToSchema)]
 /// Request body for adminrotate.
 pub struct AdminRotateRequest {
@@ -618,7 +618,7 @@ pub async fn admin_disable_secret(
     Ok(Json(AdminUiResponse::redirect("secrets")))
 }
 
-/// `POST /v1/admin/secrets/{name}/reveal` — explicit reveal action. Every
+/// `POST /v1/admin/secrets/{name}/reveal` - explicit reveal action. Every
 /// call writes a `reads` audit row; the value is returned once and
 /// never cached by the UI.
 /// Handle admin reveal secret.
@@ -643,7 +643,7 @@ pub async fn admin_reveal_secret(
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let a = crate::auth::verify_token(&state.config, &headers).await?;
-    // Reveal requires the admin scope — read scopes are not enough.
+    // Reveal requires the admin scope - read scopes are not enough.
     a.require_any_scope(&[
         "sentin8:secrets:secret:admin",
         "sentin8:sys:admin",
@@ -696,7 +696,7 @@ pub async fn admin_reveal_secret(
             )
         })?;
 
-    // Audit row — every reveal is recorded.
+    // Audit row - every reveal is recorded.
     sqlx::query(
         "INSERT INTO reads (secret_id, version, reader_subject, reader_service, reader_type, env_id)
          VALUES ($1, $2, $3, $4, 'user', $5)",
@@ -728,7 +728,7 @@ pub async fn admin_reveal_secret(
     })))
 }
 
-/// `POST /v1/admin/secrets/rotate` — rotate from the admin form. The
+/// `POST /v1/admin/secrets/rotate` - rotate from the admin form. The
 /// previous version is retained until the prune window.
 /// Handle admin rotate secret.
 #[utoipa::path(

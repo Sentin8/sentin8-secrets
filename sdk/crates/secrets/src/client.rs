@@ -12,7 +12,7 @@
 use crate::{SecretError, SecretValue};
 
 #[derive(Clone)]
-/// Sentin8:Secrets HTTP client — **certificate-presenting** on the
+/// Sentin8:Secrets HTTP client - **certificate-presenting** on the
 /// platform path (auth DESIGN §4.3f): every call presents the
 /// workload's Acme-issued client certificate in the TLS handshake.
 /// No bearer token exists on this path.
@@ -27,7 +27,7 @@ struct ResolveBody<'a> {
     r#ref: &'a str,
 }
 
-/// Body of `PUT /v1/secrets/{name}` (the machine write path — same endpoint
+/// Body of `PUT /v1/secrets/{name}` (the machine write path - same endpoint
 /// the dash/admin UI uses; M2M `sentin8:secrets:secret:write`).
 #[derive(Debug, serde::Serialize)]
 struct UpsertBody<'a> {
@@ -95,7 +95,7 @@ impl SecretsClient {
         Ok(SecretValue::new(body.value.into_bytes()))
     }
 
-    /// Store a secret value (`PUT /v1/secrets/{name}` — upsert + version
+    /// Store a secret value (`PUT /v1/secrets/{name}` - upsert + version
     /// bump). The machine write path for the DCR-credential scheme: consumers
     /// are crates that need to persist credential material by reference
     /// instead of touching the owner's tables.

@@ -19,7 +19,7 @@ pub struct SecretsConfig {
     /// Auth issuer for token verification.
     /// The sentin8 auth issuer.
     pub sentin8_auth_issuer: String,
-    /// Shared Auth client — constructed once so the discovery and JWKS
+    /// Shared Auth client - constructed once so the discovery and JWKS
     /// caches are reused across every request (5-minute TTL each).
     /// The auth client.
     pub auth_client: AuthClient,
@@ -36,7 +36,7 @@ pub struct SecretsConfig {
     /// Loaded at boot; held zeroized. NEVER logged, persisted or returned.
     /// The master key.
     pub master_key: sentin8::crypto::MasterKey,
-    /// Version prune window in days (design — versions older than the
+    /// Version prune window in days (design - versions older than the
     /// current one are pruned after this window). 0 disables pruning.
     /// The prune days.
     pub prune_days: i64,
@@ -48,7 +48,7 @@ pub struct SecretsConfig {
 
 impl std::fmt::Debug for SecretsConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // The master key is opaque (zeroized bytes) — the debug shape only
+        // The master key is opaque (zeroized bytes) - the debug shape only
         // reports whether it is loaded, never its material.
         f.debug_struct("SecretsConfig")
             .field("port", &self.port)
@@ -84,7 +84,7 @@ impl SecretsConfig {
         let sentin8_auth_issuer =
             env::var("SENTIN8_AUTH_ISSUER").unwrap_or_else(|_| cfg.sentin8_auth_issuer());
 
-        // Master key — fail-closed when absent outside dev mode.
+        // Master key - fail-closed when absent outside dev mode.
         let master_key = match sentin8::crypto::MasterKey::from_base64(
             &env::var("SENTIN8_SECRETS_MASTER_KEY").unwrap_or_default(),
         ) {
@@ -96,7 +96,7 @@ impl SecretsConfig {
                         .unwrap_or(false)
                 {
                     tracing::warn!(
-                        "SENTIN8_SECRETS_MASTER_KEY not set — generated EPHEMERAL dev master key \
+                        "SENTIN8_SECRETS_MASTER_KEY not set - generated EPHEMERAL dev master key \
                          (all stored secrets become unreadable after restart; set the env var for persistence)"
                     );
                     sentin8::crypto::MasterKey::from_bytes(&{
@@ -107,7 +107,7 @@ impl SecretsConfig {
                     .expect("32-byte key is valid")
                 } else {
                     panic!(
-                        "SENTIN8_SECRETS_MASTER_KEY must be set (base64-encoded 32 bytes) — \
+                        "SENTIN8_SECRETS_MASTER_KEY must be set (base64-encoded 32 bytes) - \
                          Sentin8:Secrets refuses to start without a master key (fail-closed, design §10)"
                     );
                 }
