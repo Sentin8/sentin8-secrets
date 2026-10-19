@@ -88,7 +88,7 @@ const WRITE_SCOPES: &[&str] = &[
         ("target_env_id" = String, Query, description = "Target env (RLS context)")
     ),
     responses(
-        (status = 200, description = "RFW page definition (rendered by Sentin8:Dash)", body = serde_json::Value),
+        (status = 200, description = "RFW page definition (rendered by Sentin8:Dash)", body = sentin8::rfw::AdminUiResponse),
         (status = 403, description = "Caller lacks a secrets read/admin scope"),
         (status = 404, description = "Unknown page"),
     ),
@@ -100,7 +100,7 @@ pub async fn get_admin_ui(
     headers: HeaderMap,
     Path(page): Path<String>,
     Query(q): Query<TargetEnvQuery>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+) -> Result<Json<AdminUiResponse>, (StatusCode, String)> {
     let a = crate::auth::verify_token(&state.config, &headers).await?;
     a.require_any_scope(READ_SCOPES)?;
     let _ = resolve_env_id(&headers, &q, &a)?;
@@ -264,9 +264,7 @@ pub async fn get_admin_ui(
             return Err((StatusCode::NOT_FOUND, format!("Unknown admin UI page: {page}")));
         }
     };
-    Ok(Json(
-        serde_json::to_value(AdminUiResponse::page(def)).unwrap(),
-    ))
+    Ok(Json(AdminUiResponse::page(def)))
 }
 
 /// `GET /v1/admin/{resource}` - returns a JSON array of admin data rows.
@@ -278,7 +276,7 @@ pub async fn get_admin_ui(
         ("target_env_id" = String, Query, description = "Target env (RLS context)")
     ),
     responses(
-        (status = 200, description = "The resource's rows for the RFW table", body = serde_json::Value),
+        (status = 200, description = "The resource's rows for the RFW table", body = sentin8::rfw::policy_pages::AdminDataRows),
         (status = 403, description = "Caller lacks a secrets read/admin scope"),
         (status = 404, description = "Unknown resource"),
     ),
@@ -304,7 +302,7 @@ pub async fn get_admin_data(
     path = "/v1/admin/secrets",
     params(("target_env_id" = String, Query, description = "Target env (RLS context)")),
     responses(
-        (status = 200, description = "The secrets rows for the RFW table (no plaintext)", body = serde_json::Value),
+        (status = 200, description = "The secrets rows for the RFW table (no plaintext)", body = sentin8::rfw::policy_pages::AdminDataRows),
         (status = 403, description = "Caller lacks a secrets read/admin scope"),
     ),
     security(("sentin8:secrets:read" = [])),
@@ -467,7 +465,7 @@ pub struct AdminUpsertRequest {
     params(("target_env_id" = String, Query, description = "Target env (RLS context)")),
     request_body = AdminUpsertRequest,
     responses(
-        (status = 200, description = "Secret stored encrypted (RFW redirect to the list)", body = serde_json::Value),
+        (status = 200, description = "Secret stored encrypted (RFW redirect to the list)", body = sentin8::rfw::policy_pages::AdminRedirectAck),
         (status = 403, description = "Caller lacks a secrets admin scope"),
     ),
     security(("sentin8:secrets:write" = [])),
@@ -575,7 +573,7 @@ pub struct AdminRotateRequest {
         ("target_env_id" = String, Query, description = "Target env (RLS context)")
     ),
     responses(
-        (status = 200, description = "Secret soft-disabled (RFW redirect)", body = serde_json::Value),
+        (status = 200, description = "Secret soft-disabled (RFW redirect)", body = sentin8::rfw::policy_pages::AdminRedirectAck),
         (status = 404, description = "Unknown secret name"),
     ),
     security(("sentin8:secrets:write" = [])),
@@ -630,7 +628,7 @@ pub async fn admin_disable_secret(
         ("target_env_id" = String, Query, description = "Target env (RLS context)")
     ),
     responses(
-        (status = 200, description = "One-time reveal (audited, never cached by the UI)", body = serde_json::Value),
+        (status = 200, description = "One-time reveal (audited, never cached by the UI)", body = sentin8::rfw::policy_pages::AdminDataRows),
         (status = 404, description = "Unknown secret name"),
     ),
     security(("sentin8:secrets:write" = [])),
@@ -737,7 +735,7 @@ pub async fn admin_reveal_secret(
     params(("target_env_id" = String, Query, description = "Target env (RLS context)")),
     request_body = AdminRotateRequest,
     responses(
-        (status = 200, description = "New version stored (the previous retained until the prune window)", body = serde_json::Value),
+        (status = 200, description = "New version stored (the previous retained until the prune window)", body = sentin8::rfw::policy_pages::AdminRedirectAck),
         (status = 404, description = "Unknown secret name"),
     ),
     security(("sentin8:secrets:write" = [])),

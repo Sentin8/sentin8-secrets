@@ -1182,19 +1182,52 @@ pub async fn maintenance_re_encrypt(
 /// the schedule is declared at boot next to `expiry-scan`). Authenticated
 /// by the cron ticker's M2M token (verified like any other principal
 /// under Shield).
+
+/// The cron proxy-back request (`schedule_type` + the env to sweep).
+#[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
+pub struct ScheduleRunRequest {
+    /// The schedule type that fired (`expiry-scan`/`version-prune`).
+    #[serde(default)]
+    pub schedule_type: String,
+    /// The env the sweep runs for.
+    pub env_id: uuid::Uuid,
+}
+
+/// The `POST /v1/internal/schedules/run` reply (the per-type maintenance
+/// result: the version-prune count, or the expiring notifications
+/// emitted).
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct ScheduleRunResponse {
+    /// The schedule that ran.
+    pub schedule_type: String,
+    /// Version rows pruned (prune run).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pruned: Option<u64>,
+    /// Expiring-secret notifications emitted (expiry run).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expiring: Option<usize>,
+    /// Expiry-disable flag (expiry run).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disabled: Option<bool>,
+    /// Always `completed`.
+    pub status: String,
+}
+
 #[utoipa::path(
     post,
     operation_id = "secrets.internal.schedules.run",
     path = "/v1/internal/schedules/run",
-    request_body = serde_json::Value,
-    responses((status = 200, description = "Maintenance run completed")),
+    request_body = ScheduleRunRequest,
+    responses((status = 200, description = "Maintenance run completed", body = ScheduleRunResponse)),
     tag = "secrets",
 )]
+/// Run the declared maintenance schedule for the cron's env.
 pub async fn internal_schedules_run(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
-    axum::Json(body): axum::Json<serde_json::Value>,
-) -> Result<axum::Json<serde_json::Value>, (StatusCode, String)> {
+    axum::Json(body): axum::Json<ScheduleRunRequest>,
+) -> Result<axum::Json<ScheduleRunResponse>, (StatusCode, String)> {
     let a = crate::auth::verify_token(&state.config, &headers).await?;
     crate::policy::require_policy(
         &state.policy,
@@ -1204,13 +1237,10 @@ pub async fn internal_schedules_run(
     )
     .await?;
     require_admin_scope(&a)?;
-    let schedule_type = body["schedule_type"].as_str().unwrap_or("unknown");
+    let schedule_type = if body.schedule_type.is_empty() { "unknown".to_string() } else { body.schedule_type.clone() };
 
     // The cron row carries a single env; run the sweep for that env.
-    let env_id = body["env_id"]
-        .as_str()
-        .and_then(|s| uuid::Uuid::parse_str(s).ok())
-        .ok_or((StatusCode::BAD_REQUEST, "missing env_id".into()))?;
+    let env_id = body.env_id;
 
     // (b) version-prune (SECRETS-2): drop prunable non-current versions for
     // the schedule's env - the same predicate the admin endpoint runs, but
@@ -1219,9 +1249,13 @@ pub async fn internal_schedules_run(
     if schedule_type == "version-prune" {
         let prune_days = state.config.prune_days;
         if prune_days <= 0 {
-            return Ok(axum::Json(
-                serde_json::json!({ "schedule_type": schedule_type, "pruned": 0, "disabled": true }),
-            ));
+            return Ok(axum::Json(ScheduleRunResponse {
+                schedule_type: schedule_type.clone(),
+                pruned: Some(0),
+                expiring: None,
+                disabled: Some(true),
+                status: "completed".to_string(),
+            }));
         }
         let mut tx = begin_tenant_tx(&state.pool, env_id).await?;
         let result = sqlx::query(
@@ -1240,11 +1274,13 @@ pub async fn internal_schedules_run(
         .map_err(db_err)?;
         tx.commit().await.map_err(db_err)?;
         tracing::info!(env_id = %env_id, pruned = result.rows_affected(), "secrets cron version-prune run");
-        return Ok(axum::Json(serde_json::json!({
-            "schedule_type": schedule_type,
-            "pruned": result.rows_affected(),
-            "status": "completed",
-        })));
+        return Ok(axum::Json(ScheduleRunResponse {
+            schedule_type: schedule_type.clone(),
+            pruned: Some(result.rows_affected()),
+            expiring: None,
+            disabled: None,
+            status: "completed".to_string(),
+        }));
     }
 
     let mut emitted = 0usize;
@@ -1281,9 +1317,11 @@ pub async fn internal_schedules_run(
     }
     tx.commit().await.map_err(db_err)?;
     tracing::info!(env_id = %env_id, emitted, "secrets cron maintenance run");
-    Ok(axum::Json(serde_json::json!({
-        "schedule_type": schedule_type,
-        "expiring": emitted,
-        "status": "completed",
-    })))
+    Ok(axum::Json(ScheduleRunResponse {
+        schedule_type,
+        pruned: None,
+        expiring: Some(emitted),
+        disabled: None,
+        status: "completed".to_string(),
+    }))
 }
