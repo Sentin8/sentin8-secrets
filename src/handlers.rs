@@ -1237,7 +1237,11 @@ pub async fn internal_schedules_run(
     )
     .await?;
     require_admin_scope(&a)?;
-    let schedule_type = if body.schedule_type.is_empty() { "unknown".to_string() } else { body.schedule_type.clone() };
+    let schedule_type = if body.schedule_type.is_empty() {
+        "unknown".to_string()
+    } else {
+        body.schedule_type.clone()
+    };
 
     // The cron row carries a single env; run the sweep for that env.
     let env_id = body.env_id;
