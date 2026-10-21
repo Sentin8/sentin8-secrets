@@ -227,7 +227,7 @@ pub async fn resolve_credential(credential_ref: &str) -> Result<SecretValue, Sec
                 .filter(|s| !s.is_empty())
                 .unwrap_or_else(|| "cli".into());
             let issuer = std::env::var("SENTIN8_AUTH_ISSUER")
-                .unwrap_or_else(|_| "https://auth.ops.sys.sentin8.local".into());
+                .unwrap_or_else(|_| "https://auth.ops.sys.local.sentin8.dev".into());
             let cert = sentin8_m2m::ensure_workload_certificate(&issuer, &workload, &ca)
                 .await
                 .map_err(|e| SecretError::Backend(format!("secrets identity: {e}")))?;
