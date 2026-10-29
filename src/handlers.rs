@@ -33,7 +33,7 @@ pub struct AppState {
     /// Master key for envelope encryption (zeroized on drop).
     /// The master key.
     pub master_key: Arc<sentin8::crypto::MasterKey>,
-    /// Shield engine ( - ): the only access gate.
+    /// Shield engine : the only access gate.
     /// The policy.
     pub policy: Arc<crate::policy::Engine>,
     /// Shared Sentin8:Policy admin surface ( - one
