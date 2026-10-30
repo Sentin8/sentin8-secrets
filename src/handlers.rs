@@ -290,14 +290,14 @@ pub async fn put_secret(
                  status = 'active',
                  expires_at = EXCLUDED.expires_at,
                  updated_at = now()
-         RETURNING id, name, description, value_cipher, key_version, version, status, created_by, env_id, created_at, updated_at"#,
+         RETURNING id, name, description, value_cipher, key_version, version, status, created_by, env_id, created_at, updated_at, expires_at"#,
     )
     .bind(&name)
     .bind(&req.description)
-    .bind(req.expires_at)
     .bind(&envelope)
     .bind(a.sub())
     .bind(env_id)
+    .bind(req.expires_at)
     .fetch_one(&mut *tx)
     .await
     .map_err(db_err)?;

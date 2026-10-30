@@ -75,6 +75,59 @@ async fn sec_secrets_envelope_roundtrip_and_metadata_shape() {
 
 // ── sec_secrets_upsert_and_version_bump ─────────────────────────────────
 
+/// Regression (bind-drift 2026-10-30): the `put_secret` handler's INSERT
+/// binds `(name, description, envelope, created_by, env_id, expires_at)` -
+/// `expires_at` MUST land in the LAST slot (the SQL placeholder contract
+/// admin_put_secret follows). A previous drift bound the timestamp at the
+/// `value_cipher` position → every PUT failed with "column value_cipher is
+/// of type bytea but expression is of type timestamp with time zone".
+/// This test pins the handler's exact SQL shape with an expiry set.
+#[tokio::test]
+async fn sec_secrets_put_path_insert_shapes_expire_at_correctly() {
+    let Some((pool, env_id)) = provision().await else {
+        return;
+    };
+    let mk = master_key();
+    let envelope = sentin8::crypto::seal_raw(&mk, b"put-shape-value").unwrap();
+    let expires = "2027-01-01T00:00:00Z"
+        .parse::<chrono::DateTime<chrono::Utc>>()
+        .ok();
+
+    let mut tx = set_ctx(&pool, env_id).await;
+
+    // The put_secret handler's exact column VALUES contract, with the
+    // expiry bound LAST (the fixed order).
+    let row: (uuid::Uuid, i32, Option<chrono::DateTime<chrono::Utc>>) =
+        sqlx::query_as(
+            "INSERT INTO secrets (name, description, value_cipher, key_version,
+             version, status, created_by, env_id, expires_at)
+             VALUES ($1, $2, $3, 1, 1, 'active', $4, $5, $6)
+             ON CONFLICT (env_id, name) DO UPDATE
+               SET description = EXCLUDED.description,
+                   value_cipher = EXCLUDED.value_cipher,
+                   key_version = 1,
+                   version = secrets.version + 1,
+                   status = 'active',
+                   expires_at = EXCLUDED.expires_at,
+                   updated_at = now()
+             RETURNING id, version, expires_at",
+        )
+        .bind("test/put-shape")
+        .bind("the put-shape regression")
+        .bind(&envelope)
+        .bind("tester")
+        .bind(env_id)
+        .bind(expires)
+        .fetch_one(&mut *tx)
+        .await
+        .expect("the handler-shaped INSERT with an expiry must accept the
+ binds");
+
+    assert_eq!(row.1, 1);
+    assert_eq!(row.2, expires);
+    tx.rollback().await.ok();
+}
+
 #[tokio::test]
 async fn sec_secrets_upsert_bumps_version_and_writes_history() {
     let Some((pool, env_id)) = provision().await else {
