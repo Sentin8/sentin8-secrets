@@ -97,9 +97,8 @@ async fn sec_secrets_put_path_insert_shapes_expire_at_correctly() {
 
     // The put_secret handler's exact column VALUES contract, with the
     // expiry bound LAST (the fixed order).
-    let row: (uuid::Uuid, i32, Option<chrono::DateTime<chrono::Utc>>) =
-        sqlx::query_as(
-            "INSERT INTO secrets (name, description, value_cipher, key_version,
+    let row: (uuid::Uuid, i32, Option<chrono::DateTime<chrono::Utc>>) = sqlx::query_as(
+        "INSERT INTO secrets (name, description, value_cipher, key_version,
              version, status, created_by, env_id, expires_at)
              VALUES ($1, $2, $3, 1, 1, 'active', $4, $5, $6)
              ON CONFLICT (env_id, name) DO UPDATE
@@ -111,17 +110,19 @@ async fn sec_secrets_put_path_insert_shapes_expire_at_correctly() {
                    expires_at = EXCLUDED.expires_at,
                    updated_at = now()
              RETURNING id, version, expires_at",
-        )
-        .bind("test/put-shape")
-        .bind("the put-shape regression")
-        .bind(&envelope)
-        .bind("tester")
-        .bind(env_id)
-        .bind(expires)
-        .fetch_one(&mut *tx)
-        .await
-        .expect("the handler-shaped INSERT with an expiry must accept the
- binds");
+    )
+    .bind("test/put-shape")
+    .bind("the put-shape regression")
+    .bind(&envelope)
+    .bind("tester")
+    .bind(env_id)
+    .bind(expires)
+    .fetch_one(&mut *tx)
+    .await
+    .expect(
+        "the handler-shaped INSERT with an expiry must accept the
+ binds",
+    );
 
     assert_eq!(row.1, 1);
     assert_eq!(row.2, expires);
