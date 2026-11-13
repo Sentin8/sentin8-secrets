@@ -4275,7 +4275,7 @@ dependencies = [
 
 [[package]]
 name = "sentin8-secrets"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "reqwest 0.12.28",
@@ -4291,14 +4291,14 @@ dependencies = [
 
 [[package]]
 name = "sentin8-secrets-sdk"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "sentin8-secrets",
 ]
 
 [[package]]
 name = "sentin8-secrets-server"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "axum",
