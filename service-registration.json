@@ -8,7 +8,8 @@
       "telemetry_property": {
         "slug": "secrets",
         "name": "Sentin8:Secrets Platform Telemetry"
-      }
+      },
+      "exposure": "internal"
     }
   ]
 }
